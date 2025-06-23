@@ -1,5 +1,5 @@
-import RMTMagtek from './NativeRMTMagtek';
+import RMTMagtek, { type Transaction } from './NativeRMTMagtek';
 
-export function multiply(a: number, b: number): number {
-  return RMTMagtek.multiply(a, b);
+export function startTransaction(transaction: Transaction): Promise<void> {
+  return RMTMagtek.startTransaction(transaction);
 }
