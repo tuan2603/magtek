@@ -1,0 +1,42 @@
+import { PaymentMethod, VASMode, VASProtocol } from '../enums';
+
+export interface ITransaction {
+  Timeout(): number;
+  PaymentMethods(): PaymentMethod[];
+  QuickChip(): boolean;
+  EMVOnly(): boolean;
+  PreventMSRSignatureForCardWithICC(): boolean;
+  SuppressThankYouMessage(): boolean;
+  DisplayAmountForQuickChip(): boolean;
+  OverrideFinalTransactionMessage(): number;
+  EMVResponseFormat(): number;
+  TransactionType(): number;
+  Amount(): string;
+  CashBack(): string;
+  CurrencyCode(): number[];
+  CurrencyExponent(): number[];
+  TransactionCategory(): number[];
+  MerchantCategory(): number[];
+  MerchantID(): number[];
+  MerchantCustomData(): number[];
+  ManualEntryType(): number;
+  ManualEntryFormat(): number;
+  ManualEntrySound(): number;
+  AppleVASMode(): VASMode;
+  AppleVASProtocol(): VASProtocol;
+  TipMode(): number;
+  Tip1DisplayMode(): number;
+  Tip2DisplayMode(): number;
+  Tip3DisplayMode(): number;
+  Tip4DisplayMode(): number;
+  Tip5DisplayMode(): number;
+  Tip6DisplayMode(): number;
+  Tip1Value(): string;
+  Tip2Value(): string;
+  Tip3Value(): string;
+  Tip4Value(): string;
+  Tip5Value(): string;
+  Tip6Value(): string;
+  TaxAmount(): string;
+  FunctionalButtonRightOption(): number[];
+}

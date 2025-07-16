@@ -1,0 +1,6 @@
+export enum BarCodeFormat {
+  BLOB = 'BLOB',
+  COMMAND = 'COMMAND',
+  BLOB_BASE64 = 'BLOB_BASE64',
+  COMMAND_BASE64 = 'COMMAND_BASE64',
+}

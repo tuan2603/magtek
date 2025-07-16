@@ -1,0 +1,6 @@
+export enum StatusCode {
+  SUCCESS = 'SUCCESS',
+  TIMEOUT = 'TIMEOUT',
+  ERROR = 'ERROR',
+  UNAVAILABLE = 'UNAVAILABLE',
+}
