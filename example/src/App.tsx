@@ -8,15 +8,27 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { startTransaction, refreshList } from 'react-native-magtek';
-import type { Transaction, Device } from '../../src/interfaces';
+import {
+  startTransaction,
+  refreshList,
+  connect,
+  disconnect,
+  resetDevice,
+} from 'react-native-magtek';
+import type {
+  Transaction,
+  Device,
+  DeviceConnection,
+} from '../../src/interfaces';
 import { request, PERMISSIONS, RESULTS } from 'react-native-permissions';
-import { Platform } from 'react-native';
+import { Platform, DeviceEventEmitter } from 'react-native';
 
 function App(): React.JSX.Element {
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState<string>('');
+  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<string>('');
 
   const handleStartTransaction = async () => {
     try {
@@ -54,15 +66,41 @@ function App(): React.JSX.Element {
     try {
       setLoading(true);
       console.log('Refreshing device list...');
-      const deviceList = await refreshList();
-      console.log('Device list received:', JSON.stringify(deviceList, null, 2));
-      setDevices(deviceList);
+      await refreshList();
+      // Device list will be received via event
     } catch (error) {
       console.error('Failed to refresh device list:', error);
-    } finally {
       setLoading(false);
     }
   };
+
+  // Add event listener for device list
+  React.useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(
+      'onDeviceListReceived',
+      (deviceList: Device[]) => {
+        console.log('Device list event received:', deviceList);
+        console.log(
+          'Device list received:',
+          JSON.stringify(deviceList, null, 2)
+        );
+        setDevices(deviceList);
+        setLoading(false);
+      }
+    );
+
+    const subscriptionConnection = DeviceEventEmitter.addListener(
+      'onDeviceConnectionReceived',
+      (deviceConnection: DeviceConnection) => {
+        console.log('Device connection event received:', deviceConnection);
+      }
+    );
+
+    return () => {
+      subscription.remove();
+      subscriptionConnection.remove();
+    };
+  }, []);
 
   const handleRequestPermissions = async () => {
     try {
@@ -95,6 +133,51 @@ function App(): React.JSX.Element {
     } catch (error) {
       console.error('Permission request failed:', error);
       setPermissionStatus('Permission request failed');
+    }
+  };
+
+  const handleSelectDevice = (device: Device) => {
+    setSelectedDevice(device);
+    console.log('Selected device:', device);
+  };
+
+  const handleConnectDevice = async () => {
+    if (!selectedDevice) {
+      setConnectionStatus('No device selected');
+      return;
+    }
+
+    try {
+      setConnectionStatus('Connecting...');
+      console.log('Connecting to device:', selectedDevice);
+      await connect(selectedDevice);
+      setConnectionStatus('Connected successfully');
+    } catch (error) {
+      console.error('Failed to connect to device:', error);
+      setConnectionStatus('Connection failed');
+    }
+  };
+
+  const handleDisconnectDevice = async () => {
+    try {
+      setConnectionStatus('Disconnecting...');
+      await disconnect();
+      setConnectionStatus('Disconnected successfully');
+      setSelectedDevice(null);
+    } catch (error) {
+      console.error('Failed to disconnect device:', error);
+      setConnectionStatus('Disconnect failed');
+    }
+  };
+
+  const handleResetDevice = async () => {
+    try {
+      setConnectionStatus('Resetting device...');
+      await resetDevice();
+      setConnectionStatus('Device reset successfully');
+    } catch (error) {
+      console.error('Failed to reset device:', error);
+      setConnectionStatus('Reset failed');
     }
   };
 
@@ -150,10 +233,52 @@ function App(): React.JSX.Element {
             <View style={styles.deviceList}>
               <Text style={styles.deviceListTitle}>Found Devices:</Text>
               {devices.map((device, index) => (
-                <View key={index} style={styles.deviceItem}>
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.deviceItem,
+                    selectedDevice?.address === device.address &&
+                      styles.selectedDeviceItem,
+                  ]}
+                  onPress={() => handleSelectDevice(device)}
+                >
                   <Text style={styles.deviceName}>{device.name}</Text>
-                </View>
+                  <Text style={styles.deviceInfo}>{device.address}</Text>
+                </TouchableOpacity>
               ))}
+            </View>
+          )}
+
+          {selectedDevice && (
+            <View style={styles.selectedDeviceSection}>
+              <Text style={styles.selectedDeviceTitle}>
+                Selected Device: {selectedDevice.name}
+              </Text>
+              <View style={styles.deviceActions}>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={handleConnectDevice}
+                >
+                  <Text style={styles.buttonText}>Connect</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={handleDisconnectDevice}
+                >
+                  <Text style={styles.buttonText}>Disconnect</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={handleResetDevice}
+                >
+                  <Text style={styles.buttonText}>Reset</Text>
+                </TouchableOpacity>
+              </View>
+              {connectionStatus && (
+                <Text style={styles.statusText}>
+                  Status: {connectionStatus}
+                </Text>
+              )}
             </View>
           )}
         </View>
@@ -243,6 +368,39 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     marginTop: 8,
     textAlign: 'center',
+  },
+  selectedDeviceItem: {
+    borderColor: '#007AFF',
+    borderWidth: 2,
+    backgroundColor: '#f0f8ff',
+  },
+  selectedDeviceSection: {
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  selectedDeviceTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  deviceActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 12,
+  },
+  actionButton: {
+    backgroundColor: '#28a745',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    minWidth: 80,
+    alignItems: 'center',
   },
 });
 

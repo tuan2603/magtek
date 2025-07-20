@@ -16,3 +16,4 @@ export type { ITransaction } from './ITransaction';
 export type { IDeviceControl } from './IDeviceControl';
 export type { Transaction } from './Transaction';
 export type { Device } from './Device';
+export type { DeviceConnection } from './DeviceConnection';

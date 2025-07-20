@@ -2,6 +2,7 @@ package com.magtek
 
 import android.util.Log
 import com.magtek.mobile.android.mtusdk.BaseData
+import com.magtek.mobile.android.mtusdk.ConnectionState
 import com.magtek.mobile.android.mtusdk.CoreAPI
 import com.magtek.mobile.android.mtusdk.DeviceType
 import com.magtek.mobile.android.mtusdk.DirectoryEntry
@@ -10,7 +11,6 @@ import com.magtek.mobile.android.mtusdk.EventType
 import com.magtek.mobile.android.mtusdk.IConfigurationCallback
 import com.magtek.mobile.android.mtusdk.IData
 import com.magtek.mobile.android.mtusdk.IDevice
-import com.magtek.mobile.android.mtusdk.IDeviceControl
 import com.magtek.mobile.android.mtusdk.IEventSubscriber
 import com.magtek.mobile.android.mtusdk.IMQTTDeviceStatusCallback
 import com.magtek.mobile.android.mtusdk.IResult
@@ -35,7 +35,12 @@ open class SessionManager : IEventSubscriber, IConfigurationCallback, IMQTTDevic
         private val TAG = "SessionManager"
     }
 
+    // Callback for processEvent
+    var mProcessEventCallback: ProcessEventCallback? = null
+
     private var mDevice: IDevice? = null
+
+    private var mDeviceList: List<IDevice>? = null
 
     private var mTransaction: Transaction? = null
     protected var mGetFileName: String = ""
@@ -97,6 +102,21 @@ open class SessionManager : IEventSubscriber, IConfigurationCallback, IMQTTDevic
     CoreAPI.stopMQTTDeviceStatusMonitoring()
   }
 
+  fun setDeviceList(deviceList: List<IDevice>) {
+    mDeviceList = deviceList
+  }
+
+  fun getDeviceList(): List<IDevice>? {
+    return mDeviceList
+  }
+
+  fun setDevice(device: IDevice) {
+    mDevice = device
+  }
+
+  fun getDevice(): IDevice? {
+    return mDevice
+  }
 
    private fun processInputRequest(data: ByteArray?) {
     val inputRequest = InputRequest(data)
@@ -429,10 +449,7 @@ open class SessionManager : IEventSubscriber, IConfigurationCallback, IMQTTDevic
 
   fun deviceReset() {
     try {
-      val deviceControl: IDeviceControl? = mDevice?.deviceControl
-      if (deviceControl != null) {
-        deviceControl.deviceReset()
-      }
+      mDevice?.deviceControl?.deviceReset()
     } catch (ex: Exception) {
       Log.d(TAG, "deviceReset: ${ex.message}")
     }
@@ -449,10 +466,7 @@ open class SessionManager : IEventSubscriber, IConfigurationCallback, IMQTTDevic
   fun connectDevice() {
     try {
       subscribeAll()
-      val deviceControl: IDeviceControl? = mDevice?.deviceControl
-      if (deviceControl != null) {
-        deviceControl.open()
-      }
+      mDevice?.deviceControl?.open()
     } catch (ex: Exception) {
       Log.d(TAG, "connectDevice: ${ex.message}")
     }
@@ -460,10 +474,7 @@ open class SessionManager : IEventSubscriber, IConfigurationCallback, IMQTTDevic
 
   fun disconnectDevice() {
     try {
-      val deviceControl: IDeviceControl? = mDevice?.deviceControl
-      if (deviceControl != null) {
-        deviceControl.close()
-      }
+      mDevice?.deviceControl?.close()
     } catch (ex: Exception) {
       Log.d(TAG, "disconnectDevice: ${ex.message}")
     }
@@ -481,7 +492,9 @@ open class SessionManager : IEventSubscriber, IConfigurationCallback, IMQTTDevic
     }
 
     try {
-      when (eventType) {
+        // Call processEvent callback if available
+        mProcessEventCallback?.invoke(eventType, data)
+        when (eventType) {
         EventType.TransactionStatus -> {
           val status = TransactionStatusBuilder.GetStatusCode(data!!.StringValue())
          if (status == TransactionStatus.TransactionStartedFromDevice) {
@@ -765,7 +778,15 @@ open class SessionManager : IEventSubscriber, IConfigurationCallback, IMQTTDevic
   }
 
   override fun OnProgress(p0: Int) {
-//    TODO("Not yet implemented")
+    when (mFileTransferMode) {
+      FileTransferMode.SEND_IMAGE -> sendToOutput("Send Image Progress: $p0")
+      FileTransferMode.SEND_FILE -> sendToOutput("Send File Progress: $p0")
+      FileTransferMode.GET_FILE -> sendToOutput("Get File Progress: $p0")
+      FileTransferMode.UPDATE_FIRMWARE -> sendToOutput("Update Firmware Progress: $p0")
+      FileTransferMode.NONE -> {
+        sendToOutput("OnProgress: $p0")
+      }
+    }
   }
 
   override fun OnResult(p0: StatusCode?, p1: ByteArray?) {
@@ -778,11 +799,41 @@ open class SessionManager : IEventSubscriber, IConfigurationCallback, IMQTTDevic
   }
 
   override fun OnConnected(p0: String?) {
-//    TODO("Not yet implemented")
+    sendToOutput("MQTT Device Connected: $p0")
+    notifyMQTTDeviceStatusChanged()
+  }
+
+  private fun notifyMQTTDeviceStatusChanged() {
+
   }
 
   override fun OnDisconnected(p0: String?) {
-//    TODO("Not yet implemented")
+    sendToOutput("MQTT Device Disconnected: $p0")
+    notifyMQTTDeviceStatusChanged()
+  }
+
+  fun isConnected(): Boolean {
+    var connected = false
+
+    val device = getDevice()
+
+    if ((device != null) && (device.connectionState == ConnectionState.Connected)) {
+      connected = true
+    }
+
+    return connected
+  }
+
+  fun isDisconnected(): Boolean {
+    var disconnected = true
+
+    val device = getDevice()
+
+    if ((device != null) && (device.connectionState != ConnectionState.Disconnected)) {
+      disconnected = false
+    }
+
+    return disconnected
   }
 
 }
